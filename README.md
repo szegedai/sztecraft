@@ -1,1 +1,1 @@
-# sztecraft
+# SZTEcraft
