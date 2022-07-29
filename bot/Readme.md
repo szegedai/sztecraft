@@ -24,11 +24,13 @@ U can communicate with the bot by whisper to it.
 
 It can gather u item.
 
+Example: 
 ```bash
 /tell <botname> get me 5 wood
 ```
 It can build u a house.
 
+Example: 
 ```bash
 /tell <botname> build a house
 ```
