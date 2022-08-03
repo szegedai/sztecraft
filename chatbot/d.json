@@ -1,0 +1,27 @@
+{
+  "commands_dict" : [
+      {
+      "get": ["get", "bring", "fetch", "grab", "obtain", "give", "want", "require", "need"],
+      "build": ["build", "construct", "erect", "assemble"],
+      "destroy": ["destroy", "deconstruct"],
+      "move": ["move", "go"],
+      "dance": ["dance", "jam"],
+      "craft": ["craft", "make", "create"],
+      "herd": ["herd"]
+        }
+  ],
+  
+  "items_dict" : [
+    {
+      "gen_item": ["wood", "wool"],
+      "spec_item": ["cobblestone", "oak_log", "golden_hoe", "dirt"]
+    }
+  ],
+  
+  "quant_dict" : [
+    {
+      "gen_quant": ["some", "few", "lot", "much", "many"],
+      "spec_quant": ["1", "2", "5", "6", "five", "six"]
+    }
+  ]
+}

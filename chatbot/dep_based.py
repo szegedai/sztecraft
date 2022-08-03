@@ -1,12 +1,17 @@
 import spacy
 from flask import Flask, jsonify
 import warnings
+from quantulum3 import parser
+import json
 
 app = Flask(__name__)
 
 warnings.filterwarnings("ignore")
 
 nlp = spacy.load('en_core_web_trf')
+
+with open('d.json') as f:
+    data = json.load(f)
 
 # GLOBAL VARIABLES
 
@@ -37,26 +42,6 @@ unknown_params = {
     "quantity": "",
     "structure": "",
     "location": ""
-}
-
-commands_dict = {
-    "get": ["get", "bring", "fetch", "grab", "obtain", "give", "want"],
-    "build": ["build", "construct", "erect", "assemble"],
-    "destroy": ["destroy", "deconstruct"],
-    "move": ["move", "go"],
-    "dance": ["dance", "jam"],
-    "craft": ["craft", "make", "create"],
-    "heard": ["heard"]
-}
-
-items_dict = {
-    "gen_item": ["wood", "oak", "wool"],
-    "spec_item": ["cobblestone", "oak_log", "golden_hoe", "dirt"]
-}
-
-quant_dict = {
-    "gen_quant": ["some", "few", "lot", "much", "many"],
-    "spec_quant": ["5", "6", "five", "six"]
 }
 
 
@@ -159,9 +144,9 @@ def proc():
 def gen2spec():
     global state
 
-    search_comm_dict = {l: k for k, v in commands_dict.items() for l in v}
-    search_item_dict = {l: k for k, v in items_dict.items() for l in v}
-    search_quant_dict = {l: k for k, v in quant_dict.items() for l in v}
+    search_comm_dict = {l: k for k, v in data["commands_dict"][0].items() for l in v}
+    search_item_dict = {l: k for k, v in data["items_dict"][0].items() for l in v}
+    search_quant_dict = {l: k for k, v in data["quant_dict"][0].items() for l in v}
 
     # GET command
     if search_comm_dict[gen_response["root"]] == "get":
@@ -189,7 +174,9 @@ def gen2spec():
             state = "ask"
             unknown_params["quantity"] = "??"
 
-    # BUILD command
+
+
+        # BUILD command
     if search_comm_dict[gen_response["root"]] == "build":
         response["command_type"] = search_comm_dict[gen_response["root"]]
         response["structure"] = gen_response["obj"]
@@ -213,10 +200,13 @@ def ask_proc():
 
     for sent in doc.sents:
         if state == "item":
+            #működjön több compoundra is, parsolja őket össze, működjön 1 szavasra is
+
             if len(list(sent.root.children)) == 1 and list(sent.root.children)[0].dep_ == "compound":
                 response["item"] = list(sent.root.children)[0].lemma_ + "_" + sent.root.lemma_
                 unknown_params["item"] = ""
                 return ask()
+
 
         if state == "quantity":
             for word in sent:
@@ -256,3 +246,4 @@ def feedback(status):
     else:
         response["message"] = "Mission failed, we'll get 'em next time"
     return jsonify([response])
+
