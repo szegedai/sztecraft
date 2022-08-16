@@ -1,38 +1,16 @@
+# IMPORTS
 import spacy
-from flask import Flask, jsonify
-import warnings
-from quantulum3 import parser
 import json
-from word2number import w2n
-
-
-#többértelmű szavak?
-
-app = Flask(__name__)
-
-warnings.filterwarnings("ignore")
+from flask import Flask, jsonify
 
 nlp = spacy.load('en_core_web_trf')
-#json configs
-
-with open('d.json') as f:
-    data = json.load(f)
-
-with open("item.json") as f:
-    itemdata = json.load(f)
-
+app = Flask(__name__)
 
 # GLOBAL VARIABLES
 
-
-itemlista = []
-for index in range(len(itemdata)):
-    itemlista.append(itemdata[index].get("name"))
-
-
+doc = nlp("hello")
 
 state = "default"
-doc = nlp("hi")
 
 gen_response = {
     "root": "",
@@ -40,6 +18,8 @@ gen_response = {
     "attr": "",
     "obj": ""
 }
+
+gen_response_list = []
 
 response = {
     "message": "",
@@ -50,18 +30,8 @@ response = {
     "location": ""
 }
 
-# Logs unknown or not specific parameters of the response
-unknown_params = {
-    "message": "",
-    "command_type": "",
-    "item": "",
-    "quantity": "",
-    "structure": "",
-    "location": ""
-}
+response_list = []
 
-
-# HELPER METHODS
 
 def reset_gen_response():
     gen_response["root"] = ""
@@ -79,193 +49,218 @@ def reset_response():
     response["location"] = ""
 
 
+problems = []
+
+
 # MAIN METHODS
 
 @app.route('/')
-def index():
-    return 'Hello!'
+def helloworld():
+    return "Hello World!"
 
 
-# This is the beginning of the program
-@app.route('/<id>/<query>')
-def preproc(id, query):
-    print(query)
-    global doc
+@app.route('/<query>')
+def start(query):
+    global gen_response_list
+    global doc, response_list
     doc = nlp(query)
 
-    if state == "default":
-        reset_response()
-        reset_gen_response()
+    reset_gen_response()
+    gen_response_list = []
 
-        proc()
-        return gen2spec()
-
+    if not problems:  # if the problems list is empty, then run the normal pipeline
+        response_list = []
+        preproc()
+        if problems:
+            return question_generator()
+        else:
+            return jsonify(response_list)
     else:
         return ask_proc()
 
 
-# Process the query if the program is in the "default" state. This method generates a generic response, based on
-# dependency patterns. This response has to be further processed (in gen2spec).
-# (e.g: If the question is "How many stone do you want?", then we are looking for a number in the response)
-def proc():
-    global doc
-    reset_gen_response()
+def preproc():
+    subsents = []
+
+    # GET ALL THE KEYWORDS WITHIN THE SAME SENTENCE AND ADD THEM TO THE ROOTS LIST
 
     for sent in doc.sents:
 
-        # PATTERN 4
-        if len(list(sent.root.children)) == 1 and list(sent.root.children)[0].dep_ == "advmod":
-            gen_response["root"] = sent.root.lemma_
-            gen_response["obj"] = list(sent.root.children)[0].lemma_
-        else:
-            for child in sent.root.children:
-                # PATTERN 1
-                if child.dep_ == "dobj":
-                    gen_response["root"] = sent.root.lemma_
-                    gen_response["obj"] = child.lemma_
+        subsents.append(sent.root)
 
-                    for child2 in child.children:
-                        if child2.dep_ == "det" or child2.dep_ == "nummod":
-                            gen_response["det"] = child2.lemma_
-                        if child2.dep_ == "amod" or child2.dep_ == "compound":
-                            gen_response["attr"] = child2.lemma_
+        # for t in [x for x in sent if x.dep_ == "conj"]:
+        #     subsents.append(t)
 
-                # PATTERN 3
-                if child.dep_ == "prep":
-                    for child2 in child.children:
-                        if child2.dep_ == "pobj":
-                            gen_response["root"] = sent.root.lemma_
-                            gen_response["obj"] = child2.lemma_
+        root = sent.root
+        while True:
+            temp = [r for r in root.children if r.dep_ == "conj"]
+            if temp:
+                subsents.append(temp[0])
+                root = temp[0]
+            else:
+                break
 
-                            for child3 in child2.children:
-                                if child3.dep_ == "amod" or child3.dep_ == "compound":
-                                    gen_response["attr"] = child3.lemma_
+    print(subsents)
+    proc(subsents)
 
-                if child.dep_ == "xcomp":
-                    gen_response["root"] = sent.root.lemma_
 
-                # PATTERN 2
-                if child.dep_ == "nsubj":
-                    gen_response["obj"] = child.lemma_
+def proc(subsents):
+    for root in subsents:
 
-                    for child2 in child.children:
-                        if child2.dep_ == "det" or child2.dep_ == "nummod":
-                            gen_response["det"] = child2.lemma_
-                        if child2.dep_ == "amod" or child2.dep_ == "compound":
-                            gen_response["attr"] = child2.lemma_
+        # PATTERN 1
+        for child in root.children:
+            if child.dep_ == "dobj":
+                gen_response["root"] = root.lemma_
+                gen_response["obj"] = child.lemma_
+                gen_response["det"] = dep_search(child, ["det", "nummod"])[0]
+                gen_response["attr"] = dep_search(child, ["compound", "amod"])[0]
+                gen_response_list.append(gen_response.copy())
+    print(gen_response_list)
+    gen2spec()
 
-    return
+
+def dep_search(word, dep):
+    # Note, that the returned type is a list spacy tokens!
+    results = [w for w in word.children if w.dep_ in dep]
+    if results:
+        return results
+    else:
+        return [""]
 
 
 def gen2spec():
-    global state
-    global doc
-    global itemlista
+    global response, state, response_list
+
+    try:
+        f = open('commands_dict.json')
+        commands_dict = json.load(f)
+        f.close()
+    except:
+        print("Error while reading JSON file!")
+
+    # commands_dict = {
+    #     "get": ["get", "bring", "fetch", "grab", "obtain", "give", "want"],
+    #     "build": ["build", "construct", "erect", "assemble"],
+    #     "destroy": ["destroy", "deconstruct"],
+    #     "move": ["move", "go"],
+    #     "dance": ["dance", "jam"],
+    #     "craft": ["craft", "make", "create"],
+    #     "heard": ["heard"]
+    # }
+
+    gen_items = ["wood", "oak", "plank", "wool"]
+    gen_quants = ["some", "few", "lot", "much", "many"]
+
+    search_comm_dict = {l: k for k, v in commands_dict.items() for l in v}
+
+    for gen_resp in gen_response_list:
+        if search_comm_dict[gen_resp["root"]] == "get":
+            print(gen_resp)
+
+            response["command_type"] = "get"
+
+            # Check if the item is in the Minecraft database, if not, check, if it is a generic item, if not, the item
+            # can't be recognized
+            try:
+                f = open('blocks.json')
+                blocks_data = json.load(f)
+                f.close()
+                response["item"] = str([x for x in blocks_data if x["name"] == gen_resp["obj"]][0]['id'])
+            except:
+                if gen_resp["obj"] in gen_items:
+                    response["item"] = "??"
+                    problems.append(gen_resp["obj"])
+
+            # Check if quantity is a number, if not, then it's probably a generic quantity
+            if gen_resp["det"].pos_ == "NUM":
+                response["quantity"] = gen_resp["det"].text
+            if gen_resp["det"].pos_ == "DET":
+                response["quantity"] = "??"
+                problems.append(gen_resp["det"].text)
+
+        response_list.append(response.copy())
+        reset_response()
+
+        print(response_list)
 
 
-    search_comm_dict = {l: k for k, v in data["commands_dict"][0].items() for l in v}
-    search_quant_dict = {l: k for k, v in data["quant_dict"][0].items() for l in v}
+def question_generator():
+    global state, problems
+
+    # Return question
+
+    # state = problems[0]
+    # Generate question with problem[0], then remove problem[0]
+
+    question = {
+        "message": "",
+        "command_type": "QUESTION",
+        "item": "",
+        "quantity": "",
+        "structure": "",
+        "location": ""
+    }
+
+    counter = 0
+
+    for resp in response_list:
+        if resp["item"] == "??":
+            question["message"] = "What do you mean by " + problems[0] + "?"
+            state = counter
+            break
+
+        if resp["quantity"] == "??":
+            question["message"] = "How much is " + problems[0] + "?"
+            state = counter
+            break
+        counter += 1
+
+    # if state == ""
+
+    return question
+    # return question
 
 
-    # GET command
-    if search_comm_dict[gen_response["root"]] == "get":
-        response["command_type"] = search_comm_dict[gen_response["root"]]
-
-        # Get name of the item from gen_response (e.g: if attr = "oak" and obj = "log" -> item="oak log";
-        # if attr = "" and obj = "cobblestone" -> item = "cobblestone")
-        if gen_response["attr"]:
-            response["item"] = gen_response["attr"] + "_" + gen_response["obj"]
-        else:
-            response["item"] = gen_response["obj"]
-
-        # Decide if given item is specific or not
-        # (e.g: specific = cobblestone, oak log, etc, non-specific (generic) = wood, wool, etc)
-        if gen_response["obj"] in itemlista:
-            response["item"] = gen_response["obj"]
-
-            if [response["item"]] not in itemlista:
-                state = "ask"
-                unknown_params["item"] = "??"
-
-        #a quantityt nem helyettesíti be csak akkor mikor benne van a listában...
-        if gen_response["det"]:
-            response["quantity"] = gen_response["det"]
-
-            # Decide if given quantity is specific or not
-            # (e.g: specific = 5, 10, 64, etc, non-specific (generic) = some, few, many, etc)
-        if response["quantity"] == "" or search_quant_dict[response["quantity"]] == "gen_quant":
-                state = "ask"
-                unknown_params["quantity"] = "??"
-
-        # BUILD command
-    if search_comm_dict[gen_response["root"]] == "build":
-        response["command_type"] = search_comm_dict[gen_response["root"]]
-        response["structure"] = gen_response["obj"]
-
-    # MOVE command
-    if search_comm_dict[gen_response["root"]] == "move":
-        response["command_type"] = search_comm_dict[gen_response["root"]]
-        response["location"] = gen_response["obj"]
-
-    # If the state is unchanged (default), then just return the filled out response json
-    if state == "ask":
-        return ask()
-    else:
-        return jsonify([response])
-
-
-# Process the incoming answer to questions
-# (e.g: If the question is "How many stone do you want?", then we are looking for a number in the response)
 def ask_proc():
-    global doc, state
+    global state, problems
+    print(response_list)
+    blocks_list = []
 
-    for sent in doc.sents:
-        if state == "item":
-            #működjön több compoundra is, parsolja őket össze, működjön 1 szavasra is
+    if response_list[int(state)]["item"] == "??":
+        try:
+            f = open('blocks.json')
+            blocks_data = json.load(f)
+            f.close()
+            for item in blocks_data:
+                blocks_list.append(item['displayName'].lower())  # Both query and word should be lowercase!
+        except:
+            print("Error while reading JSON file!")
 
-            if len(list(sent.root.children)) == 1 and list(sent.root.children)[0].dep_ == "compound":
-                response["item"] = list(sent.root.children)[0].lemma_ + "_" + sent.root.lemma_
-                unknown_params["item"] = ""
-                return ask()
-
-
-        if state == "quantity":
+        for sent in doc.sents:
             for word in sent:
-                if word.pos_ == "NUM":
-                    quantity = word.text
-                    response["quantity"] = w2n.word_to_num(quantity)
-                    unknown_params["quantity"] = ""
-                    return ask()
-    return ask()
 
+                if word.text in blocks_list:
+                    response_list[int(state)]["item"] = word.text  # ! ITEM NAME SHOULD BE CONVERTED TO ID!!!
+                    problems.pop(0)
 
-# Generating the questions based on the missing parameters
-def ask():
-    global state
-    no_more_unknown = True
-    for key in unknown_params:
-        if unknown_params[key] == "??":
-            no_more_unknown = False
-            if key == "item":  # question if the item generic
-                unknown_params["command_type"] = "ask"
-                unknown_params["message"] = "What kind of " + response["item"] + " do you want?"
-                state = "item"
-                return jsonify([unknown_params])
-            if key == "quantity":  # question if the generic or missing
-                unknown_params["command_type"] = "ask"
-                unknown_params["message"] = "How many " + response["item"] + " do you want?"
-                state = "quantity"
-                return jsonify([unknown_params])
-    if no_more_unknown:
-        state = "default"
-        return jsonify([response])
+    if response_list[int(state)]["quantity"] == "??":
+        for sent in doc.sents:
+            for word in sent:
+                if word.pos_ in "NUM":
+                    response_list[int(state)]["quantity"] = word.text
+                    problems.pop(0)
 
-
-@app.route('/status/<status>')
-def feedback(status):
-    if int(status) == 200:
-        response["message"] = "Job done"
+    # If there are still problems, generate a new question, else return all the responses
+    if not problems:
+        return response_list
     else:
-        response["message"] = "Mission failed, we'll get 'em next time"
-    return jsonify([response])
+        return question_generator()
 
+    # Answer patterns based on the question
+
+    # if a PATTERN is matched, update the response
+    # if problems is empty:
+    #     state = "default"
+    #     return response
+    # else:
+    #     return question_generator()
