@@ -32,6 +32,10 @@ response = {
 
 response_list = []
 
+problems = []
+
+
+# HELPER METHODS
 
 def reset_gen_response():
     gen_response["root"] = ""
@@ -49,7 +53,13 @@ def reset_response():
     response["location"] = ""
 
 
-problems = []
+def dep_search(word, dep):
+    # Note, that the returned type is a list spacy tokens!
+    results = [w for w in word.children if w.dep_ in dep]
+    if results:
+        return results
+    else:
+        return [""]
 
 
 # MAIN METHODS
@@ -61,6 +71,8 @@ def helloworld():
 
 @app.route('/<query>')
 def start(query):
+    # logging.info('Program started')
+
     global gen_response_list
     global doc, response_list
     doc = nlp(query)
@@ -100,6 +112,7 @@ def preproc():
             else:
                 break
 
+    # logging.info('preproc: subsents: ' + str(subsents))
     print(subsents)
     proc(subsents)
 
@@ -115,38 +128,23 @@ def proc(subsents):
                 gen_response["det"] = dep_search(child, ["det", "nummod"])[0]
                 gen_response["attr"] = dep_search(child, ["compound", "amod"])[0]
                 gen_response_list.append(gen_response.copy())
+                # logging.info('proc: PATTERN1: ' + str(gen_response_list))
     print(gen_response_list)
     gen2spec()
-
-
-def dep_search(word, dep):
-    # Note, that the returned type is a list spacy tokens!
-    results = [w for w in word.children if w.dep_ in dep]
-    if results:
-        return results
-    else:
-        return [""]
 
 
 def gen2spec():
     global response, state, response_list
 
-    try:
-        f = open('commands_dict.json')
-        commands_dict = json.load(f)
-        f.close()
-    except:
-        print("Error while reading JSON file!")
-
-    # commands_dict = {
-    #     "get": ["get", "bring", "fetch", "grab", "obtain", "give", "want"],
-    #     "build": ["build", "construct", "erect", "assemble"],
-    #     "destroy": ["destroy", "deconstruct"],
-    #     "move": ["move", "go"],
-    #     "dance": ["dance", "jam"],
-    #     "craft": ["craft", "make", "create"],
-    #     "heard": ["heard"]
-    # }
+    commands_dict = {
+        "get": ["get", "bring", "fetch", "grab", "obtain", "give", "want"],
+        "build": ["build", "construct", "erect", "assemble"],
+        "destroy": ["destroy", "deconstruct"],
+        "move": ["move", "go"],
+        "dance": ["dance", "jam"],
+        "craft": ["craft", "make", "create"],
+        "heard": ["heard"]
+    }
 
     gen_items = ["wood", "oak", "plank", "wool"]
     gen_quants = ["some", "few", "lot", "much", "many"]
@@ -187,9 +185,6 @@ def gen2spec():
 def question_generator():
     global state, problems
 
-    # Return question
-
-    # state = problems[0]
     # Generate question with problem[0], then remove problem[0]
 
     question = {
@@ -215,8 +210,6 @@ def question_generator():
             break
         counter += 1
 
-    # if state == ""
-
     return question
     # return question
 
@@ -233,8 +226,8 @@ def ask_proc():
             f.close()
             for item in blocks_data:
                 blocks_list.append(item['displayName'].lower())  # Both query and word should be lowercase!
-        except:
-            print("Error while reading JSON file!")
+        except Exception as e:
+            print("Error while reading JSON file!" + str(e))
 
         for sent in doc.sents:
             for word in sent:
@@ -250,11 +243,10 @@ def ask_proc():
                     response_list[int(state)]["quantity"] = word.text
                     problems.pop(0)
 
-    # If there are still problems, generate a new question, else return all the responses
-    if not problems:
-        return response_list
-    else:
-        return question_generator()
+                if not problems:  # if there are still problems, generate a new question
+                    return response_list
+                else:
+                    return question_generator()
 
     # Answer patterns based on the question
 
