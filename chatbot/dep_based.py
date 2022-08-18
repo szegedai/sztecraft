@@ -2,9 +2,12 @@
 import spacy
 import json
 from flask import Flask, jsonify
+import logging
 
 nlp = spacy.load('en_core_web_trf')
 app = Flask(__name__)
+logging.basicConfig(filename='logs.log', encoding='utf-8', level=logging.INFO)
+
 
 # GLOBAL VARIABLES
 
@@ -66,12 +69,13 @@ def dep_search(word, dep):
 
 @app.route('/')
 def helloworld():
+    logging.info("Hello World")
     return "Hello World!"
 
 
 @app.route('/<query>')
 def start(query):
-    # logging.info('Program started')
+    logging.info('start: query:' + str(query) + ", problems = " + str(problems))
 
     global gen_response_list
     global doc, response_list
@@ -112,7 +116,7 @@ def preproc():
             else:
                 break
 
-    # logging.info('preproc: subsents: ' + str(subsents))
+    logging.info('preproc: subsents: ' + str(subsents))
     print(subsents)
     proc(subsents)
 
@@ -128,7 +132,7 @@ def proc(subsents):
                 gen_response["det"] = dep_search(child, ["det", "nummod"])[0]
                 gen_response["attr"] = dep_search(child, ["compound", "amod"])[0]
                 gen_response_list.append(gen_response.copy())
-                # logging.info('proc: PATTERN1: ' + str(gen_response_list))
+                logging.info('proc: PATTERN1: ' + str(gen_response_list))
     print(gen_response_list)
     gen2spec()
 
@@ -179,6 +183,7 @@ def gen2spec():
         response_list.append(response.copy())
         reset_response()
 
+        logging.info('gen2spec: response_list: ' + str(response_list))
         print(response_list)
 
 
@@ -210,6 +215,7 @@ def question_generator():
             break
         counter += 1
 
+    logging.info('question_generator: question: ' + str(question))
     return question
     # return question
 
@@ -225,9 +231,10 @@ def ask_proc():
             blocks_data = json.load(f)
             f.close()
             for item in blocks_data:
-                blocks_list.append(item['displayName'].lower())  # Both query and word should be lowercase!
+                blocks_list.append(item['name'])
         except Exception as e:
-            print("Error while reading JSON file!" + str(e))
+            print(str(e))
+            logging.error(str(e))
 
         for sent in doc.sents:
             for word in sent:
@@ -236,6 +243,13 @@ def ask_proc():
                     response_list[int(state)]["item"] = word.text  # ! ITEM NAME SHOULD BE CONVERTED TO ID!!!
                     problems.pop(0)
 
+        if not problems:  # if there are still problems, generate a new question
+            logging.info('ask_proc: response_list: ' + str(response_list))
+            return response_list
+        else:
+            logging.info('ask_proc: question_generator() called. problems: ' + str(problems))
+            return question_generator()
+
     if response_list[int(state)]["quantity"] == "??":
         for sent in doc.sents:
             for word in sent:
@@ -243,16 +257,9 @@ def ask_proc():
                     response_list[int(state)]["quantity"] = word.text
                     problems.pop(0)
 
-                if not problems:  # if there are still problems, generate a new question
-                    return response_list
-                else:
-                    return question_generator()
-
-    # Answer patterns based on the question
-
-    # if a PATTERN is matched, update the response
-    # if problems is empty:
-    #     state = "default"
-    #     return response
-    # else:
-    #     return question_generator()
+        if not problems:  # if there are still problems, generate a new question
+            logging.info('ask_proc: response_list: ' + str(response_list))
+            return response_list
+        else:
+            logging.info('ask_proc: question_generator() called. problems: ' + str(problems))
+            return question_generator()
