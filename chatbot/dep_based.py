@@ -65,6 +65,23 @@ def dep_search(word, dep):
         return [""]
 
 
+def item2id(item_name):
+    try:
+        f = open('blocks.json')
+        blocks_data = json.load(f)
+        f.close()
+    except Exception as e:
+        logging.error("item2id: " + str(e))
+        return ""
+
+    for i, block in enumerate(blocks_data):
+        if block["displayName"].lower() == item_name:
+            print(i, block["displayName"])
+            return block["id"]
+
+    return ""
+
+
 # MAIN METHODS
 
 @app.route('/')
