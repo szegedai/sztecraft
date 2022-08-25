@@ -192,13 +192,31 @@ def gen2spec():
 
             # Check if quantity is a number, if not, then it's probably a generic quantity
             if gen_resp["det"].pos_ == "NUM":
-                response["quantity"] = gen_resp["det"].text
+                response["quantity"] = gen_resp["det"].text  # text2num(gen_resp["det"].text)
             if gen_resp["det"].pos_ == "DET":
                 response["quantity"] = "??"
                 problems.append(gen_resp["det"].text)
 
-        response_list.append(response.copy())
-        reset_response()
+            response_list.append(response.copy())
+            reset_response()
+
+        if search_comm_dict[gen_resp["root"]] == "build":
+            print(gen_resp)
+
+            response["command_type"] = "build"
+
+            # Check if the item is in the structures database
+            try:
+                f = open('structures.json')
+                structure_data = json.load(f)
+                f.close()
+                response["structure"] = str([x for x in structure_data if x["name"] == gen_resp["obj"]][0]['id'])
+            except:
+                response["structure"] = "??"
+                problems.append(gen_resp["obj"])
+
+            response_list.append(response.copy())
+            reset_response()
 
         logging.info('gen2spec: response_list: ' + str(response_list))
         print(response_list)
@@ -230,6 +248,11 @@ def question_generator():
             question["message"] = "How much is " + problems[0] + "?"
             state = counter
             break
+
+        if resp["structure"] == "??":
+            question["message"] = "Sorry, I don't know what a " + problems[0] + " is. What do you want?"
+            state = counter
+            break
         counter += 1
 
     logging.info('question_generator: question: ' + str(question))
@@ -241,6 +264,7 @@ def ask_proc():
     global state, problems
     print(response_list)
     blocks_list = []
+    structure_list = []
 
     if response_list[int(state)]["item"] == "??":
         try:
@@ -257,7 +281,7 @@ def ask_proc():
             for word in sent:
 
                 if word.text in blocks_list:
-                    response_list[int(state)]["item"] = item2id(word.text)  # ! ITEM NAME SHOULD BE CONVERTED TO ID!!!
+                    response_list[int(state)]["item"] = item2id(word.text)
                     problems.pop(0)
 
         if not problems:  # if there are still problems, generate a new question
@@ -272,6 +296,30 @@ def ask_proc():
             for word in sent:
                 if word.pos_ in "NUM":
                     response_list[int(state)]["quantity"] = word.text
+                    problems.pop(0)
+
+        if not problems:  # if there are still problems, generate a new question
+            logging.info('ask_proc: response_list: ' + str(response_list))
+            return response_list
+        else:
+            logging.info('ask_proc: question_generator() called. problems: ' + str(problems))
+            return question_generator()
+
+    if response_list[int(state)]["structure"] == "??":
+        try:
+            f = open('structures.json')
+            structure_data = json.load(f)
+            f.close()
+            for item in structure_data:
+                structure_list.append(item['name'])
+        except Exception as e:
+            print(str(e))
+            logging.error(str(e))
+
+        for sent in doc.sents:
+            for word in sent:
+                if word.text in structure_list:
+                    response_list[int(state)]["structure"] = str([x for x in structure_data if x["name"] == word.text][0]['id'])
                     problems.pop(0)
 
         if not problems:  # if there are still problems, generate a new question

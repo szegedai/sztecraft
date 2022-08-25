@@ -1,0 +1,16 @@
+[
+  {
+    "id": 1,
+    "name": "house"
+  },
+
+  {
+    "id": 2,
+    "name": "igloo"
+  },
+
+  {
+    "id": 3,
+    "name": "hut"
+  }
+]
