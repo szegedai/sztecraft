@@ -77,7 +77,7 @@ def item2id(item_name):
     for i, block in enumerate(blocks_data):
         if block["displayName"].lower() == item_name:
             print(i, block["displayName"])
-            return block["id"]
+            return str(block["id"])
 
     return ""
 
@@ -257,7 +257,7 @@ def ask_proc():
             for word in sent:
 
                 if word.text in blocks_list:
-                    response_list[int(state)]["item"] = word.text  # ! ITEM NAME SHOULD BE CONVERTED TO ID!!!
+                    response_list[int(state)]["item"] = item2id(word.text)  # ! ITEM NAME SHOULD BE CONVERTED TO ID!!!
                     problems.pop(0)
 
         if not problems:  # if there are still problems, generate a new question
