@@ -3,7 +3,6 @@ import spacy
 import json
 from flask import Flask, jsonify
 import logging
-
 nlp = spacy.load('en_core_web_trf')
 app = Flask(__name__)
 logging.basicConfig(filename='logs.log', encoding='utf-8', level=logging.INFO)
@@ -280,8 +279,8 @@ def ask_proc():
         for sent in doc.sents:
             for word in sent:
 
-                if word.text in blocks_list:
-                    response_list[int(state)]["item"] = item2id(word.text)
+                if word.lemma_ in blocks_list:
+                    response_list[int(state)]["item"] = item2id(word.lemma_)
                     problems.pop(0)
 
         if not problems:  # if there are still problems, generate a new question
