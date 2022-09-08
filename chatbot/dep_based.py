@@ -3,17 +3,33 @@ from flask import Flask, jsonify
 import warnings
 from quantulum3 import parser
 import json
+from word2number import w2n
+
+
+#többértelmű szavak?
 
 app = Flask(__name__)
 
 warnings.filterwarnings("ignore")
 
 nlp = spacy.load('en_core_web_trf')
+#json configs
 
 with open('d.json') as f:
     data = json.load(f)
 
+with open("item.json") as f:
+    itemdata = json.load(f)
+
+
 # GLOBAL VARIABLES
+
+
+itemlista = []
+for index in range(len(itemdata)):
+    itemlista.append(itemdata[index].get("name"))
+
+
 
 state = "default"
 doc = nlp("hi")
@@ -143,10 +159,13 @@ def proc():
 
 def gen2spec():
     global state
+    global doc
+    global itemlista
+
 
     search_comm_dict = {l: k for k, v in data["commands_dict"][0].items() for l in v}
-    search_item_dict = {l: k for k, v in data["items_dict"][0].items() for l in v}
     search_quant_dict = {l: k for k, v in data["quant_dict"][0].items() for l in v}
+
 
     # GET command
     if search_comm_dict[gen_response["root"]] == "get":
@@ -159,22 +178,24 @@ def gen2spec():
         else:
             response["item"] = gen_response["obj"]
 
+        # Decide if given item is specific or not
+        # (e.g: specific = cobblestone, oak log, etc, non-specific (generic) = wood, wool, etc)
+        if gen_response["obj"] in itemlista:
+            response["item"] = gen_response["obj"]
+
+            if [response["item"]] not in itemlista:
+                state = "ask"
+                unknown_params["item"] = "??"
+
+        #a quantityt nem helyettesíti be csak akkor mikor benne van a listában...
         if gen_response["det"]:
             response["quantity"] = gen_response["det"]
 
-        # Decide if given item is specific or not
-        # (e.g: specific = cobblestone, oak log, etc, non-specific (generic) = wood, wool, etc)
-        if search_item_dict[response["item"]] == "gen_item":
-            state = "ask"
-            unknown_params["item"] = "??"
-
-        # Decide if given quantity is specific or not
-        # (e.g: specific = 5, 10, 64, etc, non-specific (generic) = some, few, many, etc)
+            # Decide if given quantity is specific or not
+            # (e.g: specific = 5, 10, 64, etc, non-specific (generic) = some, few, many, etc)
         if response["quantity"] == "" or search_quant_dict[response["quantity"]] == "gen_quant":
-            state = "ask"
-            unknown_params["quantity"] = "??"
-
-
+                state = "ask"
+                unknown_params["quantity"] = "??"
 
         # BUILD command
     if search_comm_dict[gen_response["root"]] == "build":
@@ -211,7 +232,8 @@ def ask_proc():
         if state == "quantity":
             for word in sent:
                 if word.pos_ == "NUM":
-                    response["quantity"] = word.text
+                    quantity = word.text
+                    response["quantity"] = w2n.word_to_num(quantity)
                     unknown_params["quantity"] = ""
                     return ask()
     return ask()

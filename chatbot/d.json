@@ -1,26 +1,19 @@
 {
   "commands_dict" : [
       {
-      "get": ["get", "bring", "fetch", "grab", "obtain", "give", "want", "require", "need"],
-      "build": ["build", "construct", "erect", "assemble"],
-      "destroy": ["destroy", "deconstruct"],
-      "move": ["move", "go"],
-      "dance": ["dance", "jam"],
-      "craft": ["craft", "make", "create"],
-      "herd": ["herd"]
+      "get": ["get", "bring", "fetch", "grab", "obtain", "give", "want", "require", "need", "receive", "acquire", "gain", "earn", "buy", "purchase", "procure", "secure", "gather", "collect", "pick up", "hook", "attain", "grab", "retrieve" ],
+      "build": ["build", "construct", "erect", "assemble", "set up", "raise", "make", "fabricate", "form", "manufacture", "create", "fashion", "model", "mould", "shape", "forge","knock together"],
+      "destroy": ["destroy", "deconstruct", "blast", "demolish", "knock down", "pull down", "tear down", "level", "raze", "fell", "dismantle", "break up", "wreck", "ruin", "smash" , "shatter", "crash" ],
+      "move": ["move", "go", "walk", "proceed", "progress", "advance", "pass", "budge", "shift", "make a move", "transport", "transfer", "switch", "relocate", " leave", "migrate", "change", "climb", "get moving"],
+      "dance": ["dance", "jam", "trip", "sway", "spin", "whirl", "twirl", "pirouette", "bop", "disco", "rock", "shake a leg", "step it"],
+      "craft": ["craft", "make", "create", "compose", "fabricate", "fashion", "form", "mold", "sculpt", "shape", "couch", "express", "assemble", "piece together", "redraft", "reformulate", "reframe"],
+      "herd": ["herd", "drive", "round up", "shepherd", "gather", "collect"]
         }
   ],
-  
-  "items_dict" : [
-    {
-      "gen_item": ["wood", "wool"],
-      "spec_item": ["cobblestone", "oak_log", "golden_hoe", "dirt"]
-    }
-  ],
-  
+
   "quant_dict" : [
     {
-      "gen_quant": ["some", "few", "lot", "much", "many"],
+      "gen_quant": ["some", "few", "lot", "much", "many", "any", "little", "large", "small", "sheer", "vast"],
       "spec_quant": ["1", "2", "5", "6", "five", "six"]
     }
   ]
